@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>UNO · Cattpucin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="game-container">
+
+    <header class="game-header">
+        <div class="turn-indicator">
+            <div class="pulse-dot"></div>
+            <span id="turnIndicator">Tu turno</span>
+        </div>
+
+        <div class="score-badge">
+            <span id="scoreDisplay">0 : 0</span>
+        </div>
+    </header>
+
+    <!-- ÁREA DE MENSAJES ARRIBA -->
+    <div class="message-area-top" id="message">
+        🎮 ¡Nuevo juego! Tu turno
+    </div>
+
+    <main class="game-board">
+
+        <section class="opponent-card">
+            <div class="player-header">
+                <div class="avatar">🐶</div>
+                <div>
+                    <div class="player-name">Jugador 2 (IA)</div>
+                    <div class="player-status" id="iaStatus">Pensando...</div>
+                </div>
+                <div class="card-counter">
+                    <span id="opponentCardCount">0</span>
+                    <small>cartas</small>
+                </div>
+            </div>
+
+            <div class="opponent-cards" id="opponentCards"></div>
+            
+            <!-- MENSAJE DE LA IA -->
+            <div class="ia-message-bubble" id="iaMessage">
+                🤖 Esperando turno...
+            </div>
+        </section>
+
+        <section class="center-zone">
+            <div class="pile draw" id="drawPile">
+                Robar
+                <span class="draw-counter" id="drawCounter"></span>
+            </div>
+            <div class="pile discard" id="discardPile"></div>
+        </section>
+
+        <section class="player-card">
+            <div class="player-header">
+                <div class="avatar">🐱</div>
+                <div>
+                    <div class="player-name">Jugador 1 (Tú)</div>
+                    <div class="player-status" id="playerStatus">Tu turno</div>
+                </div>
+                <div class="card-counter">
+                    <span id="handCount">0</span>
+                    <small>cartas</small>
+                </div>
+            </div>
+
+            <div class="hand-cards" id="handCards"></div>
+
+            <div class="action-buttons">
+                <button id="unoBtn" class="btn-primary">UNO</button>
+                <button id="passBtn" disabled>Pasar</button>
+            </div>
+        </section>
+
+    </main>
+
+    <button id="resetBtn" class="reset-btn">Nuevo Juego</button>
+
+</div>
+
+<script src="js/game.js"></script>
+</body>
+</html>
