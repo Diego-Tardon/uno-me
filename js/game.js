@@ -22,6 +22,7 @@ let colorSelectionPending = false;
 let pendingDrawCards = 0;
 let playerCardsDrawnThisTurn = 0;
 let opponentCardsDrawnThisTurn = 0;
+let cardPlayedThisTurn = false;
 const MAX_DRAWS_PER_TURN = 3;
 
 // Elementos del DOM
@@ -49,6 +50,7 @@ function initGame() {
     updateUI();
     updateTurnDisplay();
     messageArea.textContent = "🎮 ¡Nuevo juego!";
+    cardPlayedThisTurn = false;
 }
 
 function createDeck() {
@@ -117,6 +119,7 @@ function dealInitialCards() {
         // Resetear contadores
         playerCardsDrawnThisTurn = 0;
         opponentCardsDrawnThisTurn = 0;
+        cardPlayedThisTurn = false;
         
         // Aplicar efecto de la primera carta
         if (firstCard.value === "Skip") {
@@ -424,7 +427,7 @@ function updateTurnDisplay() {
 function enablePlayerActions(enable) {
     const cards = document.querySelectorAll('.hand-cards .game-card');
     cards.forEach(card => {
-        if (enable && !colorSelectionPending) {
+        if (enable && !colorSelectionPending && !cardPlayedThisTurn) {
             card.style.pointerEvents = "auto";
             card.style.opacity = "1";
         } else {
@@ -434,17 +437,17 @@ function enablePlayerActions(enable) {
     });
     
     if (drawPileElement) {
-        drawPileElement.style.pointerEvents = (enable && !colorSelectionPending && playerCardsDrawnThisTurn < MAX_DRAWS_PER_TURN) ? "auto" : "none";
+        drawPileElement.style.pointerEvents = (enable && !colorSelectionPending && !cardPlayedThisTurn && playerCardsDrawnThisTurn < MAX_DRAWS_PER_TURN) ? "auto" : "none";
     }
     if (unoBtn) unoBtn.disabled = !enable || colorSelectionPending;
     if (passBtn) {
-        passBtn.disabled = !enable || colorSelectionPending || playerCardsDrawnThisTurn === 0;
+        passBtn.disabled = !enable || colorSelectionPending || (playerCardsDrawnThisTurn === 0 && !cardPlayedThisTurn);
     }
 }
 
-// CORREGIDO: Función para jugar carta
+// Función para jugar carta - SOLO UNA CARTA POR TURNO
 function playCard(index) {
-    if (currentTurn !== "player" || gameOver || colorSelectionPending) return;
+    if (currentTurn !== "player" || gameOver || colorSelectionPending || cardPlayedThisTurn) return;
     
     const card = playerHand[index];
     const topCard = discardPile[discardPile.length - 1];
@@ -452,6 +455,12 @@ function playCard(index) {
     
     if (isValidPlay(card, topCard)) {
         if (cardElement) animatePlayCard(card, cardElement);
+        
+        // Marcar que ya jugó carta este turno
+        cardPlayedThisTurn = true;
+        
+        // Deshabilitar acciones inmediatamente
+        enablePlayerActions(false);
         
         setTimeout(() => {
             const playedCard = playerHand.splice(index, 1)[0];
@@ -466,7 +475,7 @@ function playCard(index) {
                     showColorSelector((color) => {
                         playedCard.selectedColor = color;
                         messageArea.textContent = `🎨 Color cambiado a ${colorNames[color]}`;
-                        changeTurnAfterPlay("player");
+                        endPlayerTurn();
                     });
                 } else if (playedCard.value === "Wild Draw Four") {
                     showColorSelector((color) => {
@@ -484,7 +493,7 @@ function playCard(index) {
                                 }
                             }
                             updateUI();
-                            changeTurnAfterPlay("player");
+                            endPlayerTurn();
                         }, 500);
                     });
                 }
@@ -492,9 +501,9 @@ function playCard(index) {
                 // Aplicar efecto de carta especial
                 applyCardEffect(playedCard, "player");
                 
-                // Cambiar turno después de aplicar efecto
+                // Terminar turno después de aplicar efecto
                 setTimeout(() => {
-                    changeTurnAfterPlay("player");
+                    endPlayerTurn();
                 }, 600);
             }
         }, 400);
@@ -510,69 +519,7 @@ function playCard(index) {
     }
 }
 
-// CORREGIDO: Función para cambiar turno
-function changeTurnAfterPlay(currentPlayer) {
-    // Verificar si alguien ganó
-    if (playerHand.length === 0) {
-        endGame("player");
-        return;
-    }
-    if (opponentHand.length === 0) {
-        endGame("opponent");
-        return;
-    }
-    
-    console.log("Cambiando turno. SkipNext:", skipNext, "Dirección:", gameDirection);
-    
-    // Determinar próximo turno
-    if (skipNext) {
-        // Saltar al siguiente jugador
-        skipNext = false;
-        if (gameDirection === 1) {
-            currentTurn = currentPlayer === "player" ? "opponent" : "player";
-        } else {
-            currentTurn = currentPlayer === "player" ? "player" : "opponent";
-        }
-    } else {
-        // Turno normal según dirección
-        if (gameDirection === 1) {
-            currentTurn = currentPlayer === "player" ? "opponent" : "player";
-        } else {
-            currentTurn = currentPlayer === "player" ? "player" : "opponent";
-        }
-    }
-    
-    // Resetear contadores para el nuevo turno
-    if (currentTurn === "player") {
-        playerCardsDrawnThisTurn = 0;
-    } else {
-        opponentCardsDrawnThisTurn = 0;
-    }
-    
-    console.log("Nuevo turno:", currentTurn);
-    updateUI();
-    updateTurnDisplay();
-}
-
-function isValidPlay(card, topCard) {
-    // Si hay cartas pendientes por robar, solo se pueden jugar cartas del mismo tipo
-    if (pendingDrawCards > 0) {
-        return (card.value === "Draw Two" && topCard.value === "Draw Two") ||
-               (card.value === "Wild Draw Four" && topCard.value === "Wild Draw Four");
-    }
-    
-    // Cartas comodín siempre válidas
-    if (card.type === "wild") return true;
-    
-    // Si la carta superior tiene color seleccionado (por comodín)
-    if (topCard.selectedColor) {
-        return card.color === topCard.selectedColor;
-    }
-    
-    // Coincidencia normal
-    return card.color === topCard.color || card.value === topCard.value;
-}
-
+// APLICAR EFECTO DE CARTA (sin cambiar turno todavía)
 function applyCardEffect(card, player) {
     const opponent = player === "player" ? "opponent" : "player";
     
@@ -585,7 +532,7 @@ function applyCardEffect(card, player) {
         case "Reverse":
             gameDirection *= -1;
             messageArea.textContent = "↻ Dirección cambiada!";
-            // Con 2 jugadores, Reverse funciona como Skip
+            // En 2 jugadores, Reverse funciona como Skip
             skipNext = true;
             break;
             
@@ -621,7 +568,103 @@ function applyCardEffect(card, player) {
     }
 }
 
-// CORREGIDO: Turno de la IA
+// VALIDAR JUGADA
+function isValidPlay(card, topCard) {
+    // Si hay cartas pendientes por robar, solo se pueden jugar cartas del mismo tipo
+    if (pendingDrawCards > 0) {
+        return (card.value === "Draw Two" && topCard.value === "Draw Two") ||
+               (card.value === "Wild Draw Four" && topCard.value === "Wild Draw Four");
+    }
+    
+    // Cartas comodín siempre válidas
+    if (card.type === "wild") return true;
+    
+    // Si la carta superior tiene color seleccionado (por comodín)
+    if (topCard.selectedColor) {
+        return card.color === topCard.selectedColor;
+    }
+    
+    // Coincidencia normal
+    return card.color === topCard.color || card.value === topCard.value;
+}
+
+// TERMINAR TURNO DEL JUGADOR - CON LÓGICA CORRECTA DE SKIP
+function endPlayerTurn() {
+    // Verificar si alguien ganó
+    if (playerHand.length === 0) {
+        endGame("player");
+        return;
+    }
+    if (opponentHand.length === 0) {
+        endGame("opponent");
+        return;
+    }
+    
+    console.log("Terminando turno del jugador. SkipNext:", skipNext);
+    
+    // Resetear flag de carta jugada
+    cardPlayedThisTurn = false;
+    
+    if (skipNext) {
+        // Skip activado - el oponente pierde su turno y vuelve a ser turno del jugador
+        console.log("🔄 Skip activado - oponente bloqueado, vuelve turno del jugador");
+        messageArea.textContent = "🎯 ¡Oponente bloqueado! Tu turno de nuevo";
+        skipNext = false;
+        currentTurn = "player"; // El jugador juega de nuevo
+        playerCardsDrawnThisTurn = 0;
+    } else {
+        // Turno normal - pasa a la IA
+        console.log("➡️ Turno normal - pasa a IA");
+        currentTurn = "opponent";
+        opponentCardsDrawnThisTurn = 0;
+    }
+    
+    console.log("Nuevo turno:", currentTurn);
+    updateUI();
+    updateTurnDisplay();
+}
+
+// TERMINAR TURNO DE LA IA - CON LÓGICA CORRECTA DE SKIP
+function endOpponentTurn() {
+    // Verificar si alguien ganó
+    if (playerHand.length === 0) {
+        endGame("player");
+        return;
+    }
+    if (opponentHand.length === 0) {
+        endGame("opponent");
+        return;
+    }
+    
+    console.log("Terminando turno de IA. SkipNext:", skipNext);
+    
+    if (skipNext) {
+        // Skip activado - el jugador pierde su turno y vuelve a ser turno de la IA
+        console.log("🔄 Skip activado - jugador bloqueado, vuelve turno de IA");
+        messageArea.textContent = "🤖 ¡Jugador bloqueado! IA juega de nuevo";
+        skipNext = false;
+        currentTurn = "opponent"; // La IA juega de nuevo
+        opponentCardsDrawnThisTurn = 0;
+        
+        // Iniciar siguiente turno de IA inmediatamente
+        setTimeout(() => {
+            if (!gameOver && !colorSelectionPending) {
+                opponentTurn();
+            }
+        }, 1000);
+    } else {
+        // Turno normal - pasa al jugador
+        console.log("➡️ Turno normal - pasa a jugador");
+        currentTurn = "player";
+        playerCardsDrawnThisTurn = 0;
+    }
+    
+    console.log("Nuevo turno:", currentTurn);
+    updateUI();
+    updateTurnDisplay();
+}
+
+// TURNO DE LA IA
 function opponentTurn() {
     if (currentTurn !== "opponent" || gameOver || colorSelectionPending) return;
     
@@ -635,7 +678,6 @@ function opponentTurn() {
         // Buscar cartas jugables
         const playableCards = opponentHand.filter(card => {
             const valid = isValidPlay(card, topCard);
-            console.log(`Carta ${card.value} de ${card.color} es jugable?`, valid);
             return valid;
         });
         
@@ -685,15 +727,15 @@ function opponentTurn() {
                                 }
                             }
                             updateUI();
-                            changeTurnAfterPlay("opponent");
+                            endOpponentTurn();
                         }, 500);
                     } else {
-                        changeTurnAfterPlay("opponent");
+                        endOpponentTurn();
                     }
                 } else {
                     applyCardEffect(playedCard, "opponent");
                     setTimeout(() => {
-                        changeTurnAfterPlay("opponent");
+                        endOpponentTurn();
                     }, 600);
                 }
             }, 400);
@@ -724,9 +766,7 @@ function opponentTurn() {
                             console.log("IA alcanzó máximo de robos, pasa turno");
                             iaMessage.textContent = "🤖 IA pasa el turno";
                             setTimeout(() => {
-                                currentTurn = "player";
-                                playerCardsDrawnThisTurn = 0;
-                                updateTurnDisplay();
+                                endOpponentTurn();
                             }, 1000);
                         } else {
                             console.log("IA sigue robando");
@@ -741,17 +781,16 @@ function opponentTurn() {
                 console.log("IA ya robó máximo, pasa turno");
                 iaMessage.textContent = "🤖 IA pasa el turno";
                 setTimeout(() => {
-                    currentTurn = "player";
-                    playerCardsDrawnThisTurn = 0;
-                    updateTurnDisplay();
+                    endOpponentTurn();
                 }, 1000);
             }
         }
     }, 1500);
 }
 
+// ROBAR CARTA
 function drawCard() {
-    if (currentTurn !== "player" || gameOver || colorSelectionPending) return;
+    if (currentTurn !== "player" || gameOver || colorSelectionPending || cardPlayedThisTurn) return;
     
     if (playerCardsDrawnThisTurn >= MAX_DRAWS_PER_TURN) {
         messageArea.textContent = `⚠️ Ya robaste ${MAX_DRAWS_PER_TURN} cartas este turno`;
@@ -795,21 +834,21 @@ function drawCard() {
     }
 }
 
+// PASAR TURNO
 function passTurn() {
     if (currentTurn !== "player" || gameOver || colorSelectionPending) return;
     
-    if (playerCardsDrawnThisTurn === 0) {
-        messageArea.textContent = "⚠️ Debes robar al menos una carta antes de pasar";
+    if (playerCardsDrawnThisTurn === 0 && !cardPlayedThisTurn) {
+        messageArea.textContent = "⚠️ Debes robar al menos una carta o jugar antes de pasar";
         return;
     }
     
-    currentTurn = "opponent";
-    opponentCardsDrawnThisTurn = 0;
-    
     messageArea.textContent = "👋 Pasaste el turno";
-    updateTurnDisplay();
+    cardPlayedThisTurn = false; // Resetear por si acaso
+    endPlayerTurn();
 }
 
+// DECIR UNO
 function callUno() {
     if (playerHand.length === 1) {
         messageArea.textContent = "✅ ¡UNO!";
@@ -822,6 +861,7 @@ function callUno() {
     }
 }
 
+// REBARAJAR
 function reshuffleDiscardPile() {
     if (discardPile.length > 1) {
         const topCard = discardPile.pop();
@@ -832,6 +872,7 @@ function reshuffleDiscardPile() {
     }
 }
 
+// TERMINAR JUEGO
 function endGame(winner) {
     gameOver = true;
     
@@ -853,6 +894,7 @@ function endGame(winner) {
     if (iaMessage) iaMessage.textContent = "🤖 Juego terminado";
 }
 
+// CALCULAR PUNTUACIÓN
 function calculateScore(hand) {
     return hand.reduce((total, card) => {
         if (card.type === "number") return total + parseInt(card.value);
@@ -864,6 +906,7 @@ function calculateScore(hand) {
     }, 0);
 }
 
+// REINICIAR JUEGO
 function resetGame() {
     playerHand = [];
     opponentHand = [];
@@ -877,6 +920,7 @@ function resetGame() {
     pendingDrawCards = 0;
     playerCardsDrawnThisTurn = 0;
     opponentCardsDrawnThisTurn = 0;
+    cardPlayedThisTurn = false;
     
     initGame();
     messageArea.textContent = "🔄 Nuevo juego!";
